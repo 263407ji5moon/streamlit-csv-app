@@ -45,6 +45,7 @@ if uploaded_file is not None:
             st.subheader("📊 그래프 생성")
 
             selected_column = st.selectbox("컬럼 선택", numeric_columns)
+            selected_graph_type = st.selectbox("그래프 선택, ["히스토그램, "라인 차트"]);
 
             # 히스토그램
             st.write("히스토그램")
