@@ -15,41 +15,49 @@ st.title("📊 CSV 데이터 분석기")
 
 # 파일 업로드
 uploaded_file = st.file_uploader("CSV 파일을 업로드하세요", type=["csv"])
+data_type = st.
+# 인코딩 선택
+encoding_option = st.selectbox(
+    "파일 인코딩 선택",
+    ["utf-8", "cp949", "euc-kr", "utf-8-sig"]
+)
 
 if uploaded_file is not None:
-    # 데이터 읽기
-    df = pd.read_csv(uploaded_file)
+    try:
+        df = pd.read_csv(uploaded_file, encoding=encoding_option)
 
-    st.subheader("🔍 데이터 미리보기")
-    st.dataframe(df.head())
+        st.subheader("🔍 데이터 미리보기")
+        st.dataframe(df.head())
 
-    # 기본 정보
-    st.subheader("📌 데이터 정보")
-    st.write(f"행 개수: {df.shape[0]}")
-    st.write(f"열 개수: {df.shape[1]}")
+        # 기본 정보
+        st.subheader("📌 데이터 정보")
+        st.write(f"행 개수: {df.shape[0]}")
+        st.write(f"열 개수: {df.shape[1]}")
 
-    # 통계 요약
-    st.subheader("📈 통계 요약")
-    st.dataframe(df.describe())
+        # 통계 요약
+        st.subheader("📈 통계 요약")
+        st.dataframe(df.describe())
 
-    # 컬럼 선택
-    numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        # 숫자형 컬럼 선택
+        numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
 
-    if numeric_columns:
-        st.subheader("📊 그래프 생성")
+        if numeric_columns:
+            st.subheader("📊 그래프 생성")
 
-        selected_column = st.selectbox("컬럼 선택", numeric_columns)
+            selected_column = st.selectbox("컬럼 선택", numeric_columns)
 
-        # 히스토그램
-        st.write("히스토그램")
-        fig, ax = plt.subplots()
-        ax.hist(df[selected_column], bins=20)
-        ax.set_title(f"{selected_column} 분포")
-        st.pyplot(fig)
+            # 히스토그램
+            st.write("히스토그램")
+            fig, ax = plt.subplots()
+            ax.hist(df[selected_column], bins=20)
+            ax.set_title(f"{selected_column} 분포")
+            st.pyplot(fig)
 
-        # 라인 차트
-        st.write("라인 차트")
-        st.line_chart(df[selected_column])
+            # 라인 차트
+            st.write("라인 차트")
+            st.line_chart(df[selected_column])
+        else:
+            st.warning("숫자형 컬럼이 없습니다 😢")
 
-    else:
-        st.warning("숫자형 컬럼이 없습니다 😢")
+    except Exception as e:
+        st.error(f"파일을 읽는 중 오류 발생 😢\n{e}")
