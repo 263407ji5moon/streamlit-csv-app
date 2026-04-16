@@ -40,7 +40,7 @@ if uploaded_file is not None:
 
         # 숫자형 컬럼 선택
         numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
-
+#todo: 색상 선택, 레이블 추가
         if numeric_columns:
             st.subheader("📊 그래프 생성")
 
