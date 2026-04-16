@@ -15,7 +15,7 @@ st.title("📊 CSV 데이터 분석기")
 
 # 파일 업로드
 uploaded_file = st.file_uploader("CSV 파일을 업로드하세요", type=["csv"])
-data_type = st.
+
 # 인코딩 선택
 encoding_option = st.selectbox(
     "파일 인코딩 선택",
