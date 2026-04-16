@@ -46,8 +46,8 @@ if uploaded_file is not None:
 
             selected_column = st.selectbox("컬럼 선택", numeric_columns)
             selected_graph_type = st.selectbox("그래프 선택", ["막대 그래프", "꺾은선 그래프"]);
-            if selected_graph_type == "히스토그램":
-                # 히스토그램
+            if selected_graph_type == "막대 그래프":
+                # 막대 그래프
                 st.write("막대 그래프")
                 st.bar_chart(df[selected_column])
             if selected_graph_type == "꺾은선 그래프":
