@@ -53,7 +53,7 @@ if uploaded_file is not None:
                 ax.hist(df[selected_column], bins=20)
                 ax.set_title(f"{selected_column} 분포")
                 st.pyplot(fig)
-            if selected_graph_type == "꺾은선 그래프"
+            if selected_graph_type == "꺾은선 그래프":
                 # 꺾은선 그래프
                 st.write("꺾은선 그래프")
                 st.line_chart(df[selected_column])
