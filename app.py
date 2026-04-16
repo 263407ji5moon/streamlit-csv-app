@@ -45,18 +45,18 @@ if uploaded_file is not None:
             st.subheader("📊 그래프 생성")
 
             selected_column = st.selectbox("컬럼 선택", numeric_columns)
-            selected_graph_type = st.selectbox("그래프 선택", ["히스토그램", "라인 차트"]);
-
-            # 히스토그램
-            st.write("히스토그램")
-            fig, ax = plt.subplots()
-            ax.hist(df[selected_column], bins=20)
-            ax.set_title(f"{selected_column} 분포")
-            st.pyplot(fig)
-
-            # 라인 차트
-            st.write("라인 차트")
-            st.line_chart(df[selected_column])
+            selected_graph_type = st.selectbox("그래프 선택", ["히스토그램", "꺾은선 그래프"]);
+            if selected_graph_type = "히스토그램":
+                # 히스토그램
+                st.write("히스토그램")
+                fig, ax = plt.subplots()
+                ax.hist(df[selected_column], bins=20)
+                ax.set_title(f"{selected_column} 분포")
+                st.pyplot(fig)
+            if selected_graph_type = "꺾은선 그래프"
+                # 꺾은선 그래프
+                st.write("꺾은선 그래프")
+                st.line_chart(df[selected_column])
         else:
             st.warning("숫자형 컬럼이 없습니다 😢")
 
