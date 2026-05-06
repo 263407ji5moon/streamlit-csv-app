@@ -43,17 +43,17 @@ if uploaded_file is not None:
 #todo: 색상 선택, 레이블 추가
         if numeric_columns:
             st.subheader("📊 그래프 생성")
-
             selected_column = st.selectbox("컬럼 선택", numeric_columns)
             selected_graph_type = st.selectbox("그래프 선택", ["막대 그래프", "꺾은선 그래프"]);
+            graph_color = st.colorpicker("그래프 색상 선택")
             if selected_graph_type == "막대 그래프":
                 # 막대 그래프
                 st.write("막대 그래프")
-                st.bar_chart(df[selected_column])
+                st.bar_chart(df[selected_column], color = graph_color)
             if selected_graph_type == "꺾은선 그래프":
                 # 꺾은선 그래프
                 st.write("꺾은선 그래프")
-                st.line_chart(df[selected_column])
+                st.line_chart(df[selected_column], color = graph_color)
         else:
             st.warning("숫자형 컬럼이 없습니다 😢")
 
