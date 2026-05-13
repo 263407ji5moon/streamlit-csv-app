@@ -45,7 +45,7 @@ if uploaded_file is not None:
             st.subheader("📊 그래프 생성")
             selected_column = st.selectbox("컬럼 선택", numeric_columns)
             selected_graph_type = st.selectbox("그래프 선택", ["막대 그래프", "꺾은선 그래프"]);
-            graph_color = st.colorpicker("그래프 색상 선택")
+            graph_color = st.color_picker("그래프 색상 선택")
             if selected_graph_type == "막대 그래프":
                 # 막대 그래프
                 st.write("막대 그래프")
