@@ -3,6 +3,20 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import io
+import platform
+import matplotlib.pyplot as plt
+
+# 한글 폰트 설정
+system_name = platform.system()
+
+if system_name == "Windows":
+    plt.rcParams['font.family'] = 'Malgun Gothic'
+elif system_name == "Darwin":  # macOS
+    plt.rcParams['font.family'] = 'AppleGothic'
+else:  # Linux (Streamlit Cloud 포함)
+    plt.rcParams['font.family'] = 'NanumGothic'
+
+plt.rcParams['axes.unicode_minus'] = False
 
 st.set_page_config(page_title="📊 CSV 데이터 분석기", layout="wide")
 
