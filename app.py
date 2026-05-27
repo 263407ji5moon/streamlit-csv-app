@@ -1,38 +1,59 @@
 # -*- coding: utf-8 -*-
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import io
 import os
-import platform
+import shutil
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 from matplotlib import font_manager, rc
 
-# 📁 업로드하신 폰트 파일 중 기본(Regular) 폰트 지정
+# 📁 업로드하신 정확한 폰트 파일명 기록
 FONT_FILE = "NanumSquareNeo-bRg.ttf" 
 
 def set_korean_font():
-    """스타일 초기화에 대응하기 위해 폰트를 강제로 재설정하는 함수"""
-    # 1. 같은 폴더에 다운로드한 나눔스퀘어 네오 폰트 파일이 있는지 확인
+    """Matplotlib 캐시를 지우고 폰트를 강제 적용하는 절대 경로 함수"""
+    try:
+        # 1. Matplotlib 폰트 캐시 디렉토리 강제 삭제 (가장 중요)
+        # 캐시가 남아있으면 새 폰트를 추가해도 계속 네모로 나옵니다.
+        cache_dir = mpl.get_cachedir()
+        if os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
+    except Exception:
+        pass  # 캐시 삭제 중 에러는 무시하고 진행
+
+    # 2. 로컬 폰트 파일 존재 여부 확인 후 적용
     if os.path.exists(FONT_FILE):
         try:
-            font_name = font_manager.FontProperties(fname=FONT_FILE).get_name()
-            rc('font', family=font_name)
-        except Exception as e:
-            st.error(f"폰트 파일 로드 실패: {e}")
-    # 2. 폰트 파일이 없을 경우 시스템 기본 폰트로 대체 (백업용)
-    else:
-        system_name = platform.system()
-        if system_name == "Windows":
-            plt.rcParams['font.family'] = 'Malgun Gothic'
-        elif system_name == "Darwin":  # macOS
-            plt.rcParams['font.family'] = 'AppleGothic'
-        else:  # Linux (Streamlit Cloud 기본값)
-            plt.rcParams['font.family'] = 'NanumGothic'
+            # 절대 경로로 변환하여 font_manager에 직접 등록
+            font_absolute_path = os.path.abspath(FONT_FILE)
+            font_manager.fontManager.addfont(font_absolute_path)
             
+            # 등록된 폰트 파일의 실제 폰트 이름(Family Name) 추출
+            prop = font_manager.FontProperties(fname=font_absolute_path)
+            font_name = prop.get_name()
+            
+            # Matplotlib 전역 설정에 적용
+            rc('font', family=font_name)
+            plt.rcParams['font.family'] = font_name
+        except Exception as e:
+            st.error(f"⚠️ 폰트 등록 실패 (시스템 기본 전환): {e}")
+            fallback_system_font()
+    else:
+        fallback_system_font()
+        
     # 마이너스 기호 깨짐 방지
     plt.rcParams['axes.unicode_minus'] = False
 
-# 앱 시작 시 최초 폰트 설정
+def fallback_system_font():
+    """폰트 파일이 없을 때 OS별 기본 폰트 설정"""
+    import platform
+    system_name = platform.system()
+    if system_name == "Windows":
+        rc('font', family='Malgun Gothic')
+    elif system_name == "Darwin":
+        rc('font', family='AppleGothic')
+    else:
+        rc('font', family='NanumGothic')
+
+# 앱 시작 시 최우선 실행
 set_korean_font()
 
 st.set_page_config(page_title="📊 CSV 데이터 분석기", layout="wide")
