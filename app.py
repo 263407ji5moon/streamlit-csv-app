@@ -3,20 +3,36 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import io
+import os
 import platform
+from matplotlib import font_manager, rc
 
-# 한글 폰트 설정 함수 (스타일 적용 후 재설정을 위해 함수화)
+# 📁 업로드하신 폰트 파일 중 기본(Regular) 폰트 지정
+FONT_FILE = "NanumSquareNeo-bRg.ttf" 
+
 def set_korean_font():
-    system_name = platform.system()
-    if system_name == "Windows":
-        plt.rcParams['font.family'] = 'Malgun Gothic'
-    elif system_name == "Darwin":  # macOS
-        plt.rcParams['font.family'] = 'AppleGothic'
-    else:  # Linux (Streamlit Cloud 포함)
-        plt.rcParams['font.family'] = 'NanumGothic'
+    """스타일 초기화에 대응하기 위해 폰트를 강제로 재설정하는 함수"""
+    # 1. 같은 폴더에 다운로드한 나눔스퀘어 네오 폰트 파일이 있는지 확인
+    if os.path.exists(FONT_FILE):
+        try:
+            font_name = font_manager.FontProperties(fname=FONT_FILE).get_name()
+            rc('font', family=font_name)
+        except Exception as e:
+            st.error(f"폰트 파일 로드 실패: {e}")
+    # 2. 폰트 파일이 없을 경우 시스템 기본 폰트로 대체 (백업용)
+    else:
+        system_name = platform.system()
+        if system_name == "Windows":
+            plt.rcParams['font.family'] = 'Malgun Gothic'
+        elif system_name == "Darwin":  # macOS
+            plt.rcParams['font.family'] = 'AppleGothic'
+        else:  # Linux (Streamlit Cloud 기본값)
+            plt.rcParams['font.family'] = 'NanumGothic'
+            
+    # 마이너스 기호 깨짐 방지
     plt.rcParams['axes.unicode_minus'] = False
 
-# 초기 폰트 설정
+# 앱 시작 시 최초 폰트 설정
 set_korean_font()
 
 st.set_page_config(page_title="📊 CSV 데이터 분석기", layout="wide")
@@ -92,17 +108,15 @@ if uploaded_file is not None:
                     # 그래프 기본 옵션
                     selected_graph_type = st.selectbox("그래프 선택", ["막대 그래프", "꺾은선 그래프"])
                     
-                    # 🎨 [수정] 각 컬럼별 색상 선택기 동적 생성
+                    # 🎨 각 컬럼별 색상 선택기 동적 생성
                     st.write("🎨 **컬럼별 색상 지정**")
                     color_cols = st.columns(len(selected_columns))
                     column_colors = {}
                     
-                    # 기본 제공 색상 팔레트 (Matplotlib 기본 컬러 순서)
                     default_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
                     
                     for idx, col in enumerate(selected_columns):
-                        with color_cols[idx % 4]: # 4열 레이아웃으로 배치
-                            # 기본 색상이 부족할 경우를 대비해 순환 처리
+                        with color_cols[idx % 4]:
                             default_color = default_colors[idx % len(default_colors)]
                             column_colors[col] = st.color_picker(f"{col} 색상", default_color)
 
@@ -114,11 +128,11 @@ if uploaded_file is not None:
                     show_mean = st.checkbox("평균선 표시")
                     log_scale = st.checkbox("로그 스케일 사용")
                     
-                    # Matplotlib 스타일
+                    # Matplotlib 스타일 설정
                     style = st.selectbox("그래프 스타일 선택", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
                     plt.style.use(style)
                     
-                    # ⚠️ [한글 깨짐 해결] 스타일 적용 후 폰트를 반드시 재설정해야 깨지지 않습니다.
+                    # ⚠️ [핵심] 스타일 적용 직후에 폰트를 재설정해야 네모로 깨지지 않습니다.
                     set_korean_font()
                     
                     fig_width = st.slider("그래프 가로 크기", 5, 20, 10)
@@ -138,7 +152,6 @@ if uploaded_file is not None:
                     # ==========================
                     if use_plotly:
                         import plotly.express as px
-                        # Plotly에서도 개별 색상이 적용되도록 color_discrete_map 활용
                         fig = px.line(
                             filtered_df,
                             y=selected_columns,
@@ -150,16 +163,14 @@ if uploaded_file is not None:
                     else:
                         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
                         
-                        # 다중 막대 그래프 계산을 위한 변수
                         n_cols = len(selected_columns)
                         indices = filtered_df.index
-                        width = 0.8 / n_cols if n_cols > 1 else 0.8  # 컬럼 개수에 맞춰 막대 너비 조절
+                        width = 0.8 / n_cols if n_cols > 1 else 0.8
 
                         for idx, col in enumerate(selected_columns):
                             color = column_colors[col]
                             
                             if selected_graph_type == "막대 그래프":
-                                # 다중 막대가 겹치지 않고 나란히 그리도록 x축 위치 계산
                                 if n_cols > 1:
                                     pos = [x + (idx - n_cols/2 + 0.5) * width for x in range(len(indices))]
                                     ax.bar(pos, filtered_df[col], width=width, label=col, color=color)
@@ -187,7 +198,7 @@ if uploaded_file is not None:
 
                         # PNG 다운로드
                         buf = io.BytesIO()
-                        fig.savefig(buf, format="png", bbox_inches='tight') # bbox_inches로 레이블 잘림 방지
+                        fig.savefig(buf, format="png", bbox_inches='tight')
                         buf.seek(0)
                         st.download_button(
                             label="📥 그래프 PNG 다운로드",
