@@ -4,23 +4,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import io
 import platform
-import matplotlib.pyplot as plt
 
-# 한글 폰트 설정
-system_name = platform.system()
+# 한글 폰트 설정 함수 (스타일 적용 후 재설정을 위해 함수화)
+def set_korean_font():
+    system_name = platform.system()
+    if system_name == "Windows":
+        plt.rcParams['font.family'] = 'Malgun Gothic'
+    elif system_name == "Darwin":  # macOS
+        plt.rcParams['font.family'] = 'AppleGothic'
+    else:  # Linux (Streamlit Cloud 포함)
+        plt.rcParams['font.family'] = 'NanumGothic'
+    plt.rcParams['axes.unicode_minus'] = False
 
-if system_name == "Windows":
-    plt.rcParams['font.family'] = 'Malgun Gothic'
-elif system_name == "Darwin":  # macOS
-    plt.rcParams['font.family'] = 'AppleGothic'
-else:  # Linux (Streamlit Cloud 포함)
-    plt.rcParams['font.family'] = 'NanumGothic'
-
-plt.rcParams['axes.unicode_minus'] = False
+# 초기 폰트 설정
+set_korean_font()
 
 st.set_page_config(page_title="📊 CSV 데이터 분석기", layout="wide")
 
-st.title("📊 CSV 데이터 분석기 (업그레이드 버전)")
+st.title("📊 CSV 데이터 분석기")
 
 # ==========================
 # 사이드바 옵션
@@ -88,20 +89,41 @@ if uploaded_file is not None:
                 )
 
                 if selected_columns:
-                    # 그래프 옵션
+                    # 그래프 기본 옵션
                     selected_graph_type = st.selectbox("그래프 선택", ["막대 그래프", "꺾은선 그래프"])
-                    graph_color = st.color_picker("그래프 색상 선택", "#1f77b4")
+                    
+                    # 🎨 [수정] 각 컬럼별 색상 선택기 동적 생성
+                    st.write("🎨 **컬럼별 색상 지정**")
+                    color_cols = st.columns(len(selected_columns))
+                    column_colors = {}
+                    
+                    # 기본 제공 색상 팔레트 (Matplotlib 기본 컬러 순서)
+                    default_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+                    
+                    for idx, col in enumerate(selected_columns):
+                        with color_cols[idx % 4]: # 4열 레이아웃으로 배치
+                            # 기본 색상이 부족할 경우를 대비해 순환 처리
+                            default_color = default_colors[idx % len(default_colors)]
+                            column_colors[col] = st.color_picker(f"{col} 색상", default_color)
+
+                    # 기타 그래프 옵션
                     graph_title = st.text_input("그래프 제목 입력", "데이터 그래프")
                     x_label = st.text_input("X축 레이블 입력", "Index")
                     y_label = st.text_input("Y축 레이블 입력", "값")
                     show_legend = st.checkbox("범례 표시", value=True)
                     show_mean = st.checkbox("평균선 표시")
                     log_scale = st.checkbox("로그 스케일 사용")
+                    
                     # Matplotlib 스타일
-                    style = st.selectbox("그래프 스타일 선택", plt.style.available)
+                    style = st.selectbox("그래프 스타일 선택", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
                     plt.style.use(style)
+                    
+                    # ⚠️ [한글 깨짐 해결] 스타일 적용 후 폰트를 반드시 재설정해야 깨지지 않습니다.
+                    set_korean_font()
+                    
                     fig_width = st.slider("그래프 가로 크기", 5, 20, 10)
                     fig_height = st.slider("그래프 세로 크기", 3, 15, 5)
+                    
                     # 데이터 범위 선택
                     start, end = st.slider(
                         "데이터 범위 선택",
@@ -116,24 +138,42 @@ if uploaded_file is not None:
                     # ==========================
                     if use_plotly:
                         import plotly.express as px
+                        # Plotly에서도 개별 색상이 적용되도록 color_discrete_map 활용
                         fig = px.line(
                             filtered_df,
                             y=selected_columns,
                             title=graph_title,
                             labels={col: y_label for col in selected_columns},
+                            color_discrete_map=column_colors
                         )
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-                        for col in selected_columns:
+                        
+                        # 다중 막대 그래프 계산을 위한 변수
+                        n_cols = len(selected_columns)
+                        indices = filtered_df.index
+                        width = 0.8 / n_cols if n_cols > 1 else 0.8  # 컬럼 개수에 맞춰 막대 너비 조절
+
+                        for idx, col in enumerate(selected_columns):
+                            color = column_colors[col]
+                            
                             if selected_graph_type == "막대 그래프":
-                                ax.bar(filtered_df.index, filtered_df[col], label=col, color=graph_color)
+                                # 다중 막대가 겹치지 않고 나란히 그리도록 x축 위치 계산
+                                if n_cols > 1:
+                                    pos = [x + (idx - n_cols/2 + 0.5) * width for x in range(len(indices))]
+                                    ax.bar(pos, filtered_df[col], width=width, label=col, color=color)
+                                    ax.set_xticks(range(len(indices)))
+                                    ax.set_xticklabels(indices)
+                                else:
+                                    ax.bar(indices, filtered_df[col], width=width, label=col, color=color)
+                            
                             elif selected_graph_type == "꺾은선 그래프":
-                                ax.plot(filtered_df.index, filtered_df[col], label=col, color=graph_color, marker='o')
+                                ax.plot(indices, filtered_df[col], label=col, color=color, marker='o')
 
                             if show_mean:
                                 mean_val = filtered_df[col].mean()
-                                ax.axhline(mean_val, linestyle='--', color=graph_color, alpha=0.7)
+                                ax.axhline(mean_val, linestyle='--', color=color, alpha=0.7)
 
                         ax.set_title(graph_title)
                         ax.set_xlabel(x_label)
@@ -147,7 +187,7 @@ if uploaded_file is not None:
 
                         # PNG 다운로드
                         buf = io.BytesIO()
-                        fig.savefig(buf, format="png")
+                        fig.savefig(buf, format="png", bbox_inches='tight') # bbox_inches로 레이블 잘림 방지
                         buf.seek(0)
                         st.download_button(
                             label="📥 그래프 PNG 다운로드",
