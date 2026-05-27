@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
 import shutil
+import io
+import platform
+import streamlit as st  # 👈 [에러 해결] 누락되었던 streamlit 라이브러리를 추가했습니다.
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib import font_manager, rc
@@ -9,32 +12,32 @@ from matplotlib import font_manager, rc
 FONT_FILE = "NanumSquareNeo-bRg.ttf" 
 
 def set_korean_font():
-    """Matplotlib 캐시를 지우고 폰트를 강제 적용하는 절대 경로 함수"""
+    """Matplotlib 캐시를 지우고 로컬 폰트를 확실하게 강제 주입하는 함수"""
     try:
-        # 1. Matplotlib 폰트 캐시 디렉토리 강제 삭제 (가장 중요)
-        # 캐시가 남아있으면 새 폰트를 추가해도 계속 네모로 나옵니다.
+        # 1. Matplotlib 폰트 캐시 디렉토리 강제 삭제
         cache_dir = mpl.get_cachedir()
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
     except Exception:
-        pass  # 캐시 삭제 중 에러는 무시하고 진행
+        pass
 
     # 2. 로컬 폰트 파일 존재 여부 확인 후 적용
     if os.path.exists(FONT_FILE):
         try:
-            # 절대 경로로 변환하여 font_manager에 직접 등록
             font_absolute_path = os.path.abspath(FONT_FILE)
-            font_manager.fontManager.addfont(font_absolute_path)
             
-            # 등록된 폰트 파일의 실제 폰트 이름(Family Name) 추출
+            # fontManager에 직접 등록 및 전역 폰트 프로퍼티 강제 지정
+            font_manager.fontManager.addfont(font_absolute_path)
             prop = font_manager.FontProperties(fname=font_absolute_path)
             font_name = prop.get_name()
             
-            # Matplotlib 전역 설정에 적용
+            # Matplotlib 전역 설정에 확실하게 주입
             rc('font', family=font_name)
             plt.rcParams['font.family'] = font_name
+            plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
         except Exception as e:
-            st.error(f"⚠️ 폰트 등록 실패 (시스템 기본 전환): {e}")
+            # 주입 실패 시 사이드바나 메인화면에 메시지 출력 (st 선언 완료로 에러 없음)
+            st.sidebar.warning(f"⚠️ 로컬 폰트 등록 실패 (시스템 기본 전환): {e}")
             fallback_system_font()
     else:
         fallback_system_font()
@@ -43,15 +46,17 @@ def set_korean_font():
     plt.rcParams['axes.unicode_minus'] = False
 
 def fallback_system_font():
-    """폰트 파일이 없을 때 OS별 기본 폰트 설정"""
-    import platform
+    """폰트 파일이 없을 때 OS별 기본 한글 폰트 설정"""
     system_name = platform.system()
     if system_name == "Windows":
         rc('font', family='Malgun Gothic')
+        plt.rcParams['font.family'] = 'Malgun Gothic'
     elif system_name == "Darwin":
         rc('font', family='AppleGothic')
+        plt.rcParams['font.family'] = 'AppleGothic'
     else:
         rc('font', family='NanumGothic')
+        plt.rcParams['font.family'] = 'NanumGothic'
 
 # 앱 시작 시 최우선 실행
 set_korean_font()
@@ -81,6 +86,7 @@ uploaded_file = st.file_uploader("CSV 파일을 업로드하세요", type=["csv"
 
 if uploaded_file is not None:
     try:
+        import pandas as pd  # 내부에서 사용되는 pandas 안전하게 로드 확인
         df = pd.read_csv(uploaded_file, encoding=encoding_option)
         if drop_na:
             df = df.dropna()
@@ -153,7 +159,7 @@ if uploaded_file is not None:
                     style = st.selectbox("그래프 스타일 선택", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
                     plt.style.use(style)
                     
-                    # ⚠️ [핵심] 스타일 적용 직후에 폰트를 재설정해야 네모로 깨지지 않습니다.
+                    # ⚠️ 스타일 파일이 폰트를 초기화하므로 스타일 적용 직후 재설정 수행
                     set_korean_font()
                     
                     fig_width = st.slider("그래프 가로 크기", 5, 20, 10)
