@@ -10,48 +10,73 @@ import matplotlib.pyplot as plt
 from matplotlib import font_manager, rc
 
 # ==========================
-# 폰트 설정 로직
+# 📂 폰트 자동 감지 및 설정 로직
 # ==========================
-FONT_OPTIONS = {
-    "나눔스퀘어 네오 - Light (aLt)": "NanumSquareNeo-aLt.ttf",
-    "나눔스퀘어 네오 - Regular (bRg)": "NanumSquareNeo-bRg.ttf",
-    "나눔스퀘어 네오 - Bold (cBd)": "NanumSquareNeo-cBd.ttf",
-    "나눔스퀘어 네오 - ExtraBold (dEb)": "NanumSquareNeo-dEb.ttf",
-    "나눔스퀘어 네오 - Heavy (eHv)": "NanumSquareNeo-eHv.ttf"
-}
+def get_local_fonts():
+    """현재 폴더에 있는 모든 .ttf 및 .otf 폰트 파일을 자동으로 찾아오는 함수"""
+    current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+    files = os.listdir(current_dir)
+    
+    # 확장자가 .ttf 또는 .otf인 파일만 필터링
+    font_files = [f for f in files if f.lower().endswith(('.ttf', '.otf'))]
+    
+    font_dict = {}
+    for f in font_files:
+        try:
+            # 폰트 파일의 실제 내부 이름(Family Name)을 읽어와 드롭다운 표기용으로 사용
+            prop = font_manager.FontProperties(fname=os.path.abspath(f))
+            actual_name = prop.get_name()
+            # 예시: "나눔고딕 (NanumGothic.ttf)" 형태로 메뉴에 표시
+            display_name = f"{actual_name} ({f})"
+            font_dict[display_name] = f
+        except:
+            # 깨진 폰트 파일 등 예외 처리
+            font_dict[f] = f
+            
+    return font_dict
 
 def set_korean_font(font_filename):
-    """선택된 폰트 파일을 Matplotlib에 강제 주입"""
+    """선택된 폰트를 Matplotlib 메모리에서 완전히 리셋 후 강제 재등록"""
     try:
+        # 1. 캐시 완전 삭제
         cache_dir = mpl.get_cachedir()
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
     except:
         pass
 
-    if os.path.exists(font_filename):
+    if font_filename and os.path.exists(font_filename):
         try:
+            # 2. 🔥 Matplotlib 내부 폰트 메모리 저장소를 통째로 비우고 새로 빌드
+            # 이 작업이 있어야 같은 이름의 폰트 패밀리나 다른 폰트간의 실시간 전환이 백발백중 먹힙니다.
+            font_manager.fontManager = font_manager.FontManager()
+            
             font_abs_path = os.path.abspath(font_filename)
             font_manager.fontManager.addfont(font_abs_path)
             prop = font_manager.FontProperties(fname=font_abs_path)
             font_name = prop.get_name()
             
-            # 전역 폰트 강제 확정
+            # 3. 매트플롯립 전역설정 강제 주입
             rc('font', family=font_name)
             plt.rcParams['font.family'] = font_name
-            plt.rcParams['font.sans-serif'] = [font_name]
+            plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
         except Exception as e:
             st.error(f"폰트 적용 실패: {e}")
+            fallback_system_font()
     else:
-        system_name = platform.system()
-        if system_name == "Windows":
-            rc('font', family='Malgun Gothic')
-        elif system_name == "Darwin":
-            rc('font', family='AppleGothic')
-        else:
-            rc('font', family='NanumGothic')
-            
+        fallback_system_font()
+        
     plt.rcParams['axes.unicode_minus'] = False
+
+def fallback_system_font():
+    """폴더에 폰트가 하나도 없을 때 작동하는 기본 시스템 폰트"""
+    system_name = platform.system()
+    if system_name == "Windows":
+        rc('font', family='Malgun Gothic')
+    elif system_name == "Darwin":
+        rc('font', family='AppleGothic')
+    else:
+        rc('font', family='NanumGothic')
 
 # ==========================
 # 예시 데이터 생성 함수
@@ -71,17 +96,32 @@ def load_demo_data():
 st.set_page_config(page_title="📊 CSV 데이터 분석기", layout="wide")
 st.title("📊 CSV 데이터 분석기")
 
+# 폴더 내 폰트 파일들 자동 스캔
+detected_fonts = get_local_fonts()
+
 with st.sidebar:
     st.header("⚙️ 설정")
     data_source = st.radio("데이터 소스 선택", ["직접 업로드", "예시 데이터 사용"])
     
-    # 💡 @st.fragment 등을 쓰지 않고 폰트/테마 변경 시 화면이 정상 리렌더링되도록 트리거 보장
-    selected_font_label = st.selectbox("한글 폰트 스타일 선택", list(FONT_OPTIONS.keys()), index=1)
-    selected_font_file = FONT_OPTIONS[selected_font_label]
+    # 🔎 감지된 외부 폰트가 있을 때만 선택창을 띄우고, 없으면 안내 문구 표시
+    if detected_fonts:
+        selected_font_label = st.selectbox(
+            "🔤 가져온 폰트 중 선택", 
+            list(detected_fonts.keys()), 
+            index=0,
+            key="dynamic_font_selector"  # 상태 변화 추적을 위한 고유 키
+        )
+        selected_font_file = detected_fonts[selected_font_label]
+    else:
+        st.warning("⚠️ 폴더 내에 감지된 외부 폰트 파일(.ttf/.otf)이 없습니다. 시스템 기본 폰트를 사용합니다.")
+        selected_font_file = None
     
     encoding_option = st.selectbox("파일 인코딩 (업로드 시)", ["utf-8", "cp949", "euc-kr", "utf-8-sig"])
     drop_na = st.checkbox("결측치 제거", value=True)
     use_plotly = st.checkbox("Plotly 그래프 사용 (인터랙티브)", value=False)
+
+# 선택된 폰트 파일로 Matplotlib 리셋 및 로드
+set_korean_font(selected_font_file)
 
 # 데이터 로드
 df = None
@@ -123,7 +163,6 @@ if df is not None:
                     graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프"])
                     graph_title = st.text_input("그래프 제목", "데이터 분석 결과")
                 with col_cfg2:
-                    # 사용 가능한 스타일 목록 필터링 (한글 테마가 잘 먹히는 테마들 위주)
                     style = st.selectbox("그래프 테마(Style)", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
                     show_mean = st.checkbox("평균선 표시")
 
@@ -137,12 +176,8 @@ if df is not None:
                     with color_pickers[idx % len(color_pickers)]:
                         column_colors[col] = st.color_picker(f"{col}", default_colors[idx % len(default_colors)])
 
-                # ==========================================
-                # 🔥 [핵심 고정] 테마와 폰트 실시간 결합 로직
-                # ==========================================
-                # 1. 테마를 가장 먼저 적용 (기존 폰트 세팅이 리셋됨)
+                # 테마 설정 후 다시 한번 메모리 리셋 및 폰트 강제 재주입
                 plt.style.use(style)
-                # 2. 리셋된 테마 위에 폰트를 강제로 다시 입힘
                 set_korean_font(selected_font_file) 
 
                 if use_plotly:
@@ -150,13 +185,11 @@ if df is not None:
                     fig = px.line(df, x=df.columns[0], y=selected_columns, title=graph_title, color_discrete_map=column_colors)
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    # 3. Figure와 Ax를 명시적으로 생성하여 테마와 폰트 동기화 보장
                     fig, ax = plt.subplots(figsize=(10, 5))
                     
                     x_data = df[df.columns[0]].astype(str).tolist()
                     n_cols = len(selected_columns)
                     
-                    # 4. df.plot 대신 Matplotlib 순수 함수로 직접 제어 (테마 색상/폰트 꼬임 방지)
                     if graph_type == "막대 그래프":
                         import numpy as np
                         x_indexes = np.arange(len(x_data))
@@ -177,18 +210,15 @@ if df is not None:
                         for col in selected_columns:
                             ax.axhline(df[col].mean(), color=column_colors[col], linestyle='--', alpha=0.6)
 
-                    # 5. 제목 및 레이블에 폰트가 누락되지 않도록 명시적 설정
                     ax.set_title(graph_title, pad=15)
                     ax.set_ylabel("수치")
                     ax.set_xlabel(df.columns[0])
                     ax.legend(loc="upper right")
                     ax.grid(True, linestyle=':', alpha=0.6)
                     
-                    # 레이아웃 조정 후 출력
                     plt.tight_layout()
                     st.pyplot(fig)
 
-                    # 이미지 다운로드
                     buf = io.BytesIO()
                     fig.savefig(buf, format="png", bbox_inches='tight', dpi=150)
                     st.download_button("📥 그래프 결과 저장 (PNG)", buf.getvalue(), "graph_result.png", "image/png")
