@@ -1,41 +1,172 @@
-def set_korean_font(font_filename):
-    """나눔고딕 충돌 우회 및 Matplotlib 메모리 완전 리셋 함수"""
-    try:
-        # 1. 캐시 디렉토리 삭제
-        cache_dir = mpl.get_cachedir()
-        if os.path.exists(cache_dir):
-            shutil.rmtree(cache_dir)
-    except:
-        pass
+# -*- coding: utf-8 -*-
+import os
+import io
+import platform
+import pandas as pd
+import streamlit as st
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from matplotlib import font_manager, rc
 
+# ==========================
+# 📂 폰트 자동 감지 및 설정 로직 (안정성 강화 버전)
+# ==========================
+def get_local_fonts():
+    """현재 폴더에 있는 모든 .ttf 및 .otf 폰트 파일을 자동으로 찾아오는 함수"""
+    current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+    files = os.listdir(current_dir)
+    font_files = [f for f in files if f.lower().endswith(('.ttf', '.otf'))]
+    
+    font_dict = {}
+    for f in font_files:
+        try:
+            prop = font_manager.FontProperties(fname=os.path.abspath(f))
+            actual_name = prop.get_name()
+            display_name = f"{actual_name} ({f})"
+            font_dict[display_name] = f
+        except:
+            font_dict[f] = f
+    return font_dict
+
+def set_korean_font(font_filename):
+    """화면 멈춤(하얀 화면)을 방지하며 나눔고딕 충돌을 안전하게 우회하는 함수"""
     if font_filename and os.path.exists(font_filename):
         try:
-            # 2. 폰트 매니저 초기화
-            font_manager.fontManager = font_manager.FontManager()
             font_abs_path = os.path.abspath(font_filename)
             
-            # 3. 폰트 파일 정보 읽기
+            # 1. 폰트 매니저 인스턴스를 통째로 바꾸는 대신, 안전하게 폰트 파일만 추가 등록
+            font_manager.fontManager.addfont(font_abs_path)
             prop = font_manager.FontProperties(fname=font_abs_path)
             font_name = prop.get_name()
             
-            # 🔥 [핵심 추가] 오직 'NanumGothic'일 때만 발생하는 이름 충돌 우회
-            if "nanumgothic" in font_filename.lower() or "nanumgothic" in font_name.lower():
-                # 나눔고딕은 시스템 선점 이름과 겹치므로 완전히 새로운 임의의 이름으로 강제 명명합니다.
-                font_name = "ForcedNanumGothic"
-                prop.set_name(font_name)
-            
-            # 4. 매트플롯립에 새로운 이름과 경로로 강제 등록
-            font_manager.fontManager.addfont(font_abs_path)
-            
-            # 5. 전역 설정 주입
+            # 2. 나눔고딕 시스템 충돌 방지를 위해, 폰트 파일 자체를 FontProperties로 직접 제어
+            # 전역 rcParams 설정을 폰트 패밀리 이름으로 고정합니다.
             rc('font', family=font_name)
             plt.rcParams['font.family'] = font_name
-            plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
             
+            # 3. 특이 테마 대응을 위해 폰트 리스트 맨 앞에 삽입
+            if font_name not in plt.rcParams['font.sans-serif']:
+                plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
+                
         except Exception as e:
-            st.error(f"폰트 적용 실패: {e}")
+            # 에러 발생 시 스트림릿을 멈추지 않고 사이드바에 경고만 노출 (하얀 화면 방지)
+            st.sidebar.error(f"⚠️ 폰트 로드 실패: {e}")
             fallback_system_font()
     else:
         fallback_system_font()
         
     plt.rcParams['axes.unicode_minus'] = False
+
+def fallback_system_font():
+    """안전 장치용 기본 시스템 폰트"""
+    system_name = platform.system()
+    if system_name == "Windows":
+        rc('font', family='Malgun Gothic')
+    elif system_name == "Darwin":
+        rc('font', family='AppleGothic')
+    else:
+        rc('font', family='NanumGothic')
+
+# ==========================
+# 예시 데이터 생성 함수
+# ==========================
+def load_demo_data():
+    data = {
+        "월별": ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"],
+        "매출액": [2500, 2800, 3200, 3100, 3500, 4000, 4500, 4200, 3800, 3600, 4100, 4800],
+        "방문자수": [120, 150, 180, 170, 210, 250, 300, 280, 230, 210, 240, 310],
+        "만족도": [85, 88, 90, 89, 92, 95, 94, 91, 89, 87, 90, 96]
+    }
+    return pd.DataFrame(data)
+
+# ==========================
+# 스트림릿 UI 시작
+# ==========================
+st.set_page_config(page_title="📊 CSV 데이터 분석기", layout="wide")
+st.title("📊 CSV 데이터 분석기")
+
+# 폴더 내 폰트 스캔
+detected_fonts = get_local_fonts()
+
+with st.sidebar:
+    st.header("⚙️ 설정")
+    data_source = st.radio("데이터 소스 선택", ["직접 업로드", "예시 데이터 사용"])
+    
+    if detected_fonts:
+        selected_font_label = st.selectbox(
+            "🔤 가져온 폰트 중 선택", 
+            list(detected_fonts.keys()), 
+            index=0,
+            key="font_selector_stable"
+        )
+        selected_font_file = detected_fonts[selected_font_label]
+    else:
+        st.warning("⚠️ 폴더 내에 폰트 파일이 없습니다.")
+        selected_font_file = None
+    
+    encoding_option = st.selectbox("파일 인코딩 (업로드 시)", ["utf-8", "cp949", "euc-kr", "utf-8-sig"])
+    drop_na = st.checkbox("결측치 제거", value=True)
+    use_plotly = st.checkbox("Plotly 그래프 사용 (인터랙티브)", value=False)
+
+# 최초 폰트 설정
+set_korean_font(selected_font_file)
+
+# 데이터 로드
+df = None
+if data_source == "예시 데이터 사용":
+    df = load_demo_data()
+    st.info("💡 시연용 예시 데이터를 불러왔습니다.")
+else:
+    uploaded_file = st.file_uploader("CSV 파일을 업로드하세요", type=["csv"])
+    if uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file, encoding=encoding_option)
+            if drop_na:
+                df = df.dropna()
+        except Exception as e:
+            st.error(f"파일 로드 오류: {e}")
+
+if df is not None:
+    tab1, tab2 = st.tabs(["🔍 데이터 미리보기", "📈 그래프 분석"])
+
+    with tab1:
+        st.subheader("📋 데이터셋 정보")
+        col1, col2 = st.columns(2)
+        col1.metric("행 개수", df.shape[0])
+        col2.metric("열 개수", df.shape[1])
+        st.dataframe(df, use_container_width=True)
+        st.subheader("📊 통계 요약")
+        st.dataframe(df.describe(), use_container_width=True)
+
+    with tab2:
+        numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns.tolist()
+        
+        if numeric_columns:
+            st.subheader("🎨 그래프 설정")
+            selected_columns = st.multiselect("분석할 컬럼을 선택하세요", numeric_columns, default=numeric_columns[:1])
+            
+            if selected_columns:
+                col_cfg1, col_cfg2 = st.columns(2)
+                with col_cfg1:
+                    graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프"])
+                    graph_title = st.text_input("그래프 제목", "데이터 분석 결과")
+                with col_cfg2:
+                    style = st.selectbox("그래프 테마(Style)", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
+                    show_mean = st.checkbox("평균선 표시")
+
+                # 컬럼별 색상 선택
+                st.write("🖌️ **컬럼별 색상 지정**")
+                color_pickers = st.columns(len(selected_columns))
+                column_colors = {}
+                default_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+                
+                for idx, col in enumerate(selected_columns):
+                    with color_pickers[idx % len(color_pickers)]:
+                        column_colors[col] = st.color_picker(f"{col}", default_colors[idx % len(default_colors)])
+
+                # 테마 설정 후 다시 한번 폰트 주입
+                plt.style.use(style)
+                set_korean_font(selected_font_file) 
+                
+                plt.close('all') 
+                fig, ax = plt.subplots
