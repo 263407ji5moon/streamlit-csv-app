@@ -169,4 +169,58 @@ if df is not None:
                 set_korean_font(selected_font_file) 
                 
                 plt.close('all') 
-                fig, ax = plt.subplots
+                fig, ax = plt.subplots(figsize=(10, 5))
+                
+                x_data = df[df.columns[0]].astype(str).tolist()
+                n_cols = len(selected_columns)
+                
+                if graph_type == "막대 그래프":
+                    import numpy as np
+                    x_indexes = np.arange(len(x_data))
+                    width = 0.6 / n_cols
+                    
+                    for idx, col in enumerate(selected_columns):
+                        offset = (idx - (n_cols - 1) / 2) * width
+                        ax.bar(x_indexes + offset, df[col], width=width, label=col, color=column_colors[col])
+                    
+                    ax.set_xticks(x_indexes)
+                    ax.set_xticklabels(x_data, rotation=45)
+                else:
+                    for col in selected_columns:
+                        ax.plot(x_data, df[col], marker='o', linewidth=2, label=col, color=column_colors[col])
+                    plt.xticks(rotation=45)
+
+                if show_mean:
+                    for col in selected_columns:
+                        ax.axhline(df[col].mean(), color=column_colors[col], linestyle='--', alpha=0.6)
+
+                # 개별 요소 텍스트 폰트 속성 직접 강제 적용 (안전성 확보)
+                if selected_font_file and os.path.exists(selected_font_file):
+                    font_p = font_manager.FontProperties(fname=os.path.abspath(selected_font_file))
+                    ax.set_title(graph_title, pad=15, fontproperties=font_p)
+                    ax.set_ylabel("수치", fontproperties=font_p)
+                    ax.set_xlabel(df.columns[0], fontproperties=font_p)
+                    for tick in ax.get_xticklabels():
+                        tick.set_fontproperties(font_p)
+                    for tick in ax.get_yticklabels():
+                        tick.set_fontproperties(font_p)
+                    if ax.get_legend():
+                        plt.setp(ax.get_legend().get_texts(), fontproperties=font_p)
+                else:
+                    ax.set_title(graph_title, pad=15)
+                    ax.set_ylabel("수치")
+                    ax.set_xlabel(df.columns[0])
+
+                ax.grid(True, linestyle=':', alpha=0.6)
+                
+                plt.tight_layout()
+                st.pyplot(fig)
+
+                buf = io.BytesIO()
+                fig.savefig(buf, format="png", bbox_inches='tight', dpi=150)
+                st.download_button("📥 그래프 결과 저장 (PNG)", buf.getvalue(), "graph_result.png", "image/png")
+        else:
+            st.warning("분석 가능한 숫자형 데이터가 없습니다.")
+else:
+    st.write("---")
+    st.write("👈 사이드바에서 데이터를 업로드하거나 '예시 데이터 사용'을 선택해 주세요.")
