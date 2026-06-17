@@ -34,13 +34,12 @@ def set_korean_font(font_filename):
         try:
             font_abs_path = os.path.abspath(font_filename)
             
-            # 1. 폰트 매니저 인스턴스를 통째로 바꾸는 대신, 안전하게 폰트 파일만 추가 등록
+            # 1. 안전하게 폰트 파일만 추가 등록
             font_manager.fontManager.addfont(font_abs_path)
             prop = font_manager.FontProperties(fname=font_abs_path)
             font_name = prop.get_name()
             
-            # 2. 나눔고딕 시스템 충돌 방지를 위해, 폰트 파일 자체를 FontProperties로 직접 제어
-            # 전역 rcParams 설정을 폰트 패밀리 이름으로 고정합니다.
+            # 2. 전역 rcParams 설정을 폰트 패밀리 이름으로 고정
             rc('font', family=font_name)
             plt.rcParams['font.family'] = font_name
             
@@ -49,7 +48,6 @@ def set_korean_font(font_filename):
                 plt.rcParams['font.sans-serif'] = [font_name] + plt.rcParams['font.sans-serif']
                 
         except Exception as e:
-            # 에러 발생 시 스트림릿을 멈추지 않고 사이드바에 경고만 노출 (하얀 화면 방지)
             st.sidebar.error(f"⚠️ 폰트 로드 실패: {e}")
             fallback_system_font()
     else:
@@ -148,7 +146,8 @@ if df is not None:
             if selected_columns:
                 col_cfg1, col_cfg2 = st.columns(2)
                 with col_cfg1:
-                    graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프"])
+                    # ✨ 그래프 종류에 산점도와 영역형 그래프 추가
+                    graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프", "산점도 (Scatter)", "영역형 그래프"])
                     graph_title = st.text_input("그래프 제목", "데이터 분석 결과")
                 with col_cfg2:
                     style = st.selectbox("그래프 테마(Style)", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
@@ -174,6 +173,7 @@ if df is not None:
                 x_data = df[df.columns[0]].astype(str).tolist()
                 n_cols = len(selected_columns)
                 
+                # --- 📊 그래프 그리기 로직 (종류 분기) ---
                 if graph_type == "막대 그래프":
                     import numpy as np
                     x_indexes = np.arange(len(x_data))
@@ -185,9 +185,22 @@ if df is not None:
                     
                     ax.set_xticks(x_indexes)
                     ax.set_xticklabels(x_data, rotation=45)
-                else:
+                    
+                elif graph_type == "꺾은선 그래프":
                     for col in selected_columns:
                         ax.plot(x_data, df[col], marker='o', linewidth=2, label=col, color=column_colors[col])
+                    plt.xticks(rotation=45)
+                    
+                elif graph_type == "산점도 (Scatter)":
+                    for col in selected_columns:
+                        ax.scatter(x_data, df[col], s=100, label=col, color=column_colors[col], alpha=0.8, edgecolors='black')
+                    plt.xticks(rotation=45)
+                    
+                elif graph_type == "영역형 그래프":
+                    # 누적되지 않고 각각의 독립된 영역을 투명도(alpha)를 주어 겹쳐서 표현
+                    for col in selected_columns:
+                        ax.fill_between(x_data, df[col], label=col, color=column_colors[col], alpha=0.4)
+                        ax.plot(x_data, df[col], color=column_colors[col], linewidth=1.5)
                     plt.xticks(rotation=45)
 
                 if show_mean:
