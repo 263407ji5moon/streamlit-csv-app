@@ -210,7 +210,7 @@ if df is not None:
                         ax.set_xlabel("값 범위")
                         ax.legend()
                     
-                   elif graph_type == "박스 플롯":
+                    elif graph_type == "박스 플롯":
                         # 1. 선택된 컬럼들만 모아서 결측치를 제외한 임시 데이터프레임 생성
                         df_box = df[selected_columns].dropna()
                         
