@@ -211,12 +211,16 @@ if df is not None:
                         ax.legend()
                     
                     elif graph_type == "박스 플롯":
-                        # 🔥 [수정] 결측치(NaN)를 완벽히 제거한 데이터셋만 추출하여 전달
-                        clean_data = [df[col].dropna().tolist() for col in selected_columns]
+                        # 1. 데이터셋을 순수한 파이썬 리스트로 강제 변환
+                        clean_data = [list(df[col].dropna()) for col in selected_columns]
                         
-                        # 데이터가 모두 비어있을 경우를 대비한 안전장치
+                        # 2. 🔥 [핵심 수정] 라벨(컬럼명) 배열도 순수한 파이썬 문자열 리스트로 강제 변환
+                        clean_labels = [str(col) for col in selected_columns]
+                        
+                        # 데이터가 존재하는지 안전 검사 후 그리기
                         if any(clean_data):
-                            bp = ax.boxplot(clean_data, labels=selected_columns, patch_artist=True)
+                            # labels에 순수 리스트인 clean_labels를 전달합니다.
+                            bp = ax.boxplot(clean_data, labels=clean_labels, patch_artist=True)
                             
                             # 각 박스에 컬럼별 색상 적용
                             for patch, col in zip(bp['boxes'], selected_columns):
