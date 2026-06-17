@@ -86,6 +86,17 @@ st.title("📊 CSV 데이터 분석기")
 # 폴더 내 폰트 스캔
 detected_fonts = get_local_fonts()
 
+# 마커 모양 매핑 딕셔너리
+MARKER_OPTIONS = {
+    '원형 (●)': 'o',
+    '사각형 (■)': 's',
+    '삼각형 (▲)': '^',
+    '다이아몬드 (◆)': 'D',
+    '별형 (★)': '*',
+    '점형 (·)': '.',
+    'X형 (✖)': 'x'
+}
+
 with st.sidebar:
     st.header("⚙️ 설정")
     data_source = st.radio("데이터 소스 선택", ["직접 업로드", "예시 데이터 사용"])
@@ -146,89 +157,158 @@ if df is not None:
             if selected_columns:
                 col_cfg1, col_cfg2 = st.columns(2)
                 with col_cfg1:
-                    # ✨ 그래프 종류에 산점도와 영역형 그래프 추가
-                    graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프", "산점도 (Scatter)", "영역형 그래프"])
+                    # 그래프 종류 추가: 영역형, 히스토그램, 박스 플롯 추가
+                    graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프", "산점도 (Scatter)", "영역형 그래프", "히스토그램", "박스 플롯"])
                     graph_title = st.text_input("그래프 제목", "데이터 분석 결과")
                 with col_cfg2:
                     style = st.selectbox("그래프 테마(Style)", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
                     show_mean = st.checkbox("평균선 표시")
 
-                # 컬럼별 색상 선택
-                st.write("🖌️ **컬럼별 색상 지정**")
-                color_pickers = st.columns(len(selected_columns))
-                column_colors = {}
+                # 컬럼별 스타일 설정 (색상 및 마커)
+                st.write("🖌️ **컬럼별 스타일 지정**")
+                column_styles = {}
                 default_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+                marker_keys = list(MARKER_OPTIONS.keys())
                 
-                for idx, col in enumerate(selected_columns):
-                    with color_pickers[idx % len(color_pickers)]:
-                        column_colors[col] = st.color_picker(f"{col}", default_colors[idx % len(default_colors)])
+                # 컬럼 수에 맞춰 동적으로 컬럼 레이아웃 생성
+                cols_per_row = 4
+                n_rows = (len(selected_columns) + cols_per_row - 1) // cols_per_row
+                
+                for row in range(n_rows):
+                    st_cols = st.columns(cols_per_row)
+                    for col_idx in range(cols_per_row):
+                        idx = row * cols_per_row + col_idx
+                        if idx < len(selected_columns):
+                            col_name = selected_columns[idx]
+                            with st_cols[col_idx]:
+                                st.markdown(f"**{col_name}**")
+                                # 색상 선택
+                                color = st.color_picker(f"색상", default_colors[idx % len(default_colors)], key=f"color_{col_name}")
+                                
+                                # 마커 선택 (꺾은선, 산점도에서 사용)
+                                marker_label = st.selectbox(f"점 모양", marker_keys, index=0, key=f"marker_{col_name}")
+                                marker_code = MARKER_OPTIONS[marker_label]
+                                
+                                column_styles[col_name] = {'color': color, 'marker': marker_code}
 
                 # 테마 설정 후 다시 한번 폰트 주입
                 plt.style.use(style)
                 set_korean_font(selected_font_file) 
                 
                 plt.close('all') 
-                fig, ax = plt.subplots(figsize=(10, 5))
                 
-                x_data = df[df.columns[0]].astype(str).tolist()
-                n_cols = len(selected_columns)
-                
-                # --- 📊 그래프 그리기 로직 (종류 분기) ---
-                if graph_type == "막대 그래프":
-                    import numpy as np
-                    x_indexes = np.arange(len(x_data))
-                    width = 0.6 / n_cols
+                # 그래프 종류에 따라 Figure 생성 방식 다름 (박스 플롯, 히스토그램은 한 번에 그리기 용이)
+                if graph_type in ["히스토그램", "박스 플롯"]:
+                    # 이 종류들은 pandas plot이 더 간편할 수 있으나 폰트 유지를 위해 matplotlib ax 사용
+                    fig, ax = plt.subplots(figsize=(10, 5))
                     
-                    for idx, col in enumerate(selected_columns):
-                        offset = (idx - (n_cols - 1) / 2) * width
-                        ax.bar(x_indexes + offset, df[col], width=width, label=col, color=column_colors[col])
+                    if graph_type == "히스토그램":
+                        # 여러 컬럼을 겹쳐 그리기 위해 반복문 사용
+                        for col in selected_columns:
+                            ax.hist(df[col], bins=20, alpha=0.5, label=col, color=column_styles[col]['color'], edgecolor='black')
+                        ax.set_ylabel("빈도수")
+                        ax.set_xlabel("값 범위")
+                        ax.legend()
                     
-                    ax.set_xticks(x_indexes)
-                    ax.set_xticklabels(x_data, rotation=45)
-                    
-                elif graph_type == "꺾은선 그래프":
-                    for col in selected_columns:
-                        ax.plot(x_data, df[col], marker='o', linewidth=2, label=col, color=column_colors[col])
-                    plt.xticks(rotation=45)
-                    
-                elif graph_type == "산점도 (Scatter)":
-                    for col in selected_columns:
-                        ax.scatter(x_data, df[col], s=100, label=col, color=column_colors[col], alpha=0.8, edgecolors='black')
-                    plt.xticks(rotation=45)
-                    
-                elif graph_type == "영역형 그래프":
-                    # 누적되지 않고 각각의 독립된 영역을 투명도(alpha)를 주어 겹쳐서 표현
-                    for col in selected_columns:
-                        ax.fill_between(x_data, df[col], label=col, color=column_colors[col], alpha=0.4)
-                        ax.plot(x_data, df[col], color=column_colors[col], linewidth=1.5)
-                    plt.xticks(rotation=45)
+                    elif graph_type == "박스 플롯":
+                        # 박스플롯은 데이터프레임 전체를 넘기는게 일반적
+                        # 색상 지정을 위해 patch_artist=True 사용
+                        bp = ax.boxplot([df[col] for col in selected_columns], labels=selected_columns, patch_artist=True)
+                        
+                        # 각 박스에 컬럼별 색상 적용
+                        for patch, col in zip(bp['boxes'], selected_columns):
+                            patch.set_facecolor(column_styles[col]['color'])
+                            patch.set_alpha(0.7)
+                        
+                        # 중앙값 선, 수염 등 스타일 설정 (선택사항)
+                        plt.setp(bp['medians'], color='black', linewidth=1.5)
+                        
+                        ax.set_ylabel("값 분표")
 
-                if show_mean:
-                    for col in selected_columns:
-                        ax.axhline(df[col].mean(), color=column_colors[col], linestyle='--', alpha=0.6)
+                else:
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    
+                    x_data = df[df.columns[0]].astype(str).tolist()
+                    n_cols = len(selected_columns)
+                    
+                    # 4. df.plot 대신 Matplotlib 순수 함수로 직접 제어 (테마 색상/폰트 꼬임 방지)
+                    if graph_type == "막대 그래프":
+                        import numpy as np
+                        x_indexes = np.arange(len(x_data))
+                        # 항목 간 간격 조정을 위해 너비 계산 수정
+                        total_width = 0.8
+                        width = total_width / n_cols
+                        
+                        for idx, col in enumerate(selected_columns):
+                            offset = (idx - (n_cols - 1) / 2) * width
+                            ax.bar(x_indexes + offset, df[col], width=width, label=col, color=column_styles[col]['color'])
+                        
+                        ax.set_xticks(x_indexes)
+                        ax.set_xticklabels(x_data, rotation=45)
+                    
+                    elif graph_type == "꺾은선 그래프":
+                        for col in selected_columns:
+                            # 선택된 마커 모양 적용
+                            ax.plot(x_data, df[col], marker=column_styles[col]['marker'], linewidth=2, markersize=8, label=col, color=column_styles[col]['color'])
+                        plt.xticks(rotation=45)
+                        
+                    elif graph_type == "산점도 (Scatter)":
+                        for col in selected_columns:
+                            # 선택된 마커 모양 적용
+                            ax.scatter(x_data, df[col], s=100, marker=column_styles[col]['marker'], label=col, color=column_styles[col]['color'], alpha=0.8, edgecolors='black')
+                        plt.xticks(rotation=45)
+                        
+                    elif graph_type == "영역형 그래프":
+                        # 누적되지 않고 각각 그리기 위해 fill_between 사용
+                        for col in selected_columns:
+                            ax.fill_between(x_data, df[col], label=col, color=column_styles[col]['color'], alpha=0.3)
+                            # 테두리 선 추가
+                            ax.plot(x_data, df[col], color=column_styles[col]['color'], linewidth=1)
+                        plt.xticks(rotation=45)
 
-                # 개별 요소 텍스트 폰트 속성 직접 강제 적용 (안전성 확보)
+                # 평균선 표시 (히스토그램, 박스플롯 제외)
+                if show_mean and graph_type not in ["히스토그램", "박스 플롯"]:
+                    for col in selected_columns:
+                        ax.axhline(df[col].mean(), color=column_styles[col]['color'], linestyle='--', alpha=0.6)
+
+                # 5. 제목 및 레이블에 폰트가 누락되지 않도록 명시적 설정
                 if selected_font_file and os.path.exists(selected_font_file):
                     font_p = font_manager.FontProperties(fname=os.path.abspath(selected_font_file))
-                    ax.set_title(graph_title, pad=15, fontproperties=font_p)
-                    ax.set_ylabel("수치", fontproperties=font_p)
-                    ax.set_xlabel(df.columns[0], fontproperties=font_p)
+                    ax.set_title(graph_title, pad=15, fontproperties=font_p, fontsize=16)
+                    
+                    # 히스토그램, 박스플롯은 위에서 레이블 설정함
+                    if graph_type not in ["히스토그램", "박스 플롯"]:
+                        ax.set_ylabel("수치", fontproperties=font_p)
+                        ax.set_xlabel(df.columns[0], fontproperties=font_p)
+                    else:
+                        # 이미 설정된 레이블 폰트 적용
+                        ax.xaxis.label.set_fontproperties(font_p)
+                        ax.yaxis.label.set_fontproperties(font_p)
+                        
+                    # 축 눈금 폰트 설정
                     for tick in ax.get_xticklabels():
                         tick.set_fontproperties(font_p)
                     for tick in ax.get_yticklabels():
                         tick.set_fontproperties(font_p)
+                    
+                    # 범례 폰트 설정 (존재할 경우)
                     if ax.get_legend():
                         plt.setp(ax.get_legend().get_texts(), fontproperties=font_p)
+                        
                 else:
-                    ax.set_title(graph_title, pad=15)
-                    ax.set_ylabel("수치")
-                    ax.set_xlabel(df.columns[0])
-
+                    # 시스템 폰트 사용 시 기본 설정
+                    ax.set_title(graph_title, pad=15, fontsize=16)
+                    if graph_type not in ["히스토그램", "박스 플롯"]:
+                        ax.set_ylabel("수치")
+                        ax.set_xlabel(df.columns[0])
+                    
                 ax.grid(True, linestyle=':', alpha=0.6)
                 
+                # 레이아웃 조정 후 출력
                 plt.tight_layout()
                 st.pyplot(fig)
 
+                # 이미지 다운로드
                 buf = io.BytesIO()
                 fig.savefig(buf, format="png", bbox_inches='tight', dpi=150)
                 st.download_button("📥 그래프 결과 저장 (PNG)", buf.getvalue(), "graph_result.png", "image/png")
