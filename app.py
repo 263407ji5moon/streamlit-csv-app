@@ -210,26 +210,30 @@ if df is not None:
                         ax.set_xlabel("값 범위")
                         ax.legend()
                     
-                    elif graph_type == "박스 플롯":
-                        # 1. 데이터셋을 순수한 파이썬 리스트로 강제 변환
-                        clean_data = [list(df[col].dropna()) for col in selected_columns]
+                   elif graph_type == "박스 플롯":
+                        # 1. 선택된 컬럼들만 모아서 결측치를 제외한 임시 데이터프레임 생성
+                        df_box = df[selected_columns].dropna()
                         
-                        # 2. 🔥 [핵심 수정] 라벨(컬럼명) 배열도 순수한 파이썬 문자열 리스트로 강제 변환
-                        clean_labels = [str(col) for col in selected_columns]
-                        
-                        # 데이터가 존재하는지 안전 검사 후 그리기
-                        if any(clean_data):
-                            # labels에 순수 리스트인 clean_labels를 전달합니다.
-                            bp = ax.boxplot(clean_data, labels=clean_labels, patch_artist=True)
+                        if not df_box.empty:
+                            # 2. 🔥 [핵심 치트키] 판다스 자체 boxplot 함수를 활용해 Matplotlib ax에 직접 그리기
+                            # 이렇게 하면 최신 Matplotlib의 sanitize_sequence 에러를 완벽하게 우회합니다.
+                            bp_dict = df_box.boxplot(ax=ax, patch_artist=True, return_type='dict')
                             
-                            # 각 박스에 컬럼별 색상 적용
-                            for patch, col in zip(bp['boxes'], selected_columns):
-                                patch.set_facecolor(column_styles[col]['color'])
-                                patch.set_alpha(0.7)
+                            # 3. 컬럼별 커스텀 색상 매칭 및 입히기
+                            for idx, col in enumerate(selected_columns):
+                                if idx < len(bp_dict['boxes']):
+                                    patch = bp_dict['boxes'][idx]
+                                    patch.set_facecolor(column_styles[col]['color'])
+                                    patch.set_alpha(0.7)
                             
-                            # 중앙값 선 스타일 설정
-                            plt.setp(bp['medians'], color='black', linewidth=1.5)
+                            # 중앙값 선 스타일 조정
+                            for median in bp_dict['medians']:
+                                median.set_color('black')
+                                median.set_linewidth(1.5)
+                                
                             ax.set_ylabel("값 분포")
+                            # 판다스 기본 그리드가 겹치지 않도록 깔끔하게 정리
+                            ax.grid(True, linestyle=':', alpha=0.6)
                         else:
                             st.warning("⚠️ 선택한 컬럼에 유효한 숫자 데이터가 없습니다.")
                 else:
