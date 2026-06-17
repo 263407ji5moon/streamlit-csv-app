@@ -211,20 +211,23 @@ if df is not None:
                         ax.legend()
                     
                     elif graph_type == "박스 플롯":
-                        # 박스플롯은 데이터프레임 전체를 넘기는게 일반적
-                        # 색상 지정을 위해 patch_artist=True 사용
-                        bp = ax.boxplot([df[col] for col in selected_columns], labels=selected_columns, patch_artist=True)
+                        # 🔥 [수정] 결측치(NaN)를 완벽히 제거한 데이터셋만 추출하여 전달
+                        clean_data = [df[col].dropna().tolist() for col in selected_columns]
                         
-                        # 각 박스에 컬럼별 색상 적용
-                        for patch, col in zip(bp['boxes'], selected_columns):
-                            patch.set_facecolor(column_styles[col]['color'])
-                            patch.set_alpha(0.7)
-                        
-                        # 중앙값 선, 수염 등 스타일 설정 (선택사항)
-                        plt.setp(bp['medians'], color='black', linewidth=1.5)
-                        
-                        ax.set_ylabel("값 분표")
-
+                        # 데이터가 모두 비어있을 경우를 대비한 안전장치
+                        if any(clean_data):
+                            bp = ax.boxplot(clean_data, labels=selected_columns, patch_artist=True)
+                            
+                            # 각 박스에 컬럼별 색상 적용
+                            for patch, col in zip(bp['boxes'], selected_columns):
+                                patch.set_facecolor(column_styles[col]['color'])
+                                patch.set_alpha(0.7)
+                            
+                            # 중앙값 선 스타일 설정
+                            plt.setp(bp['medians'], color='black', linewidth=1.5)
+                            ax.set_ylabel("값 분포")
+                        else:
+                            st.warning("⚠️ 선택한 컬럼에 유효한 숫자 데이터가 없습니다.")
                 else:
                     fig, ax = plt.subplots(figsize=(10, 5))
                     
