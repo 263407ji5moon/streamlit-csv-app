@@ -79,7 +79,7 @@ st.title("📊 CSV 데이터 분석기")
 
 detected_fonts = get_local_fonts()
 
-# 마커 모양 매핑 (Matplotlib용 / Plotly용)
+# 마커 모양 매핑
 MARKER_OPTIONS = {
     '원형 (●)': {'mpl': 'o', 'plotly': 'circle'},
     '사각형 (■)': {'mpl': 's', 'plotly': 'square'},
@@ -146,13 +146,17 @@ if df is not None:
             selected_columns = st.multiselect("분석할 컬럼을 선택하세요", numeric_columns, default=numeric_columns[:1])
             
             if selected_columns:
-                col_cfg1, col_cfg2 = st.columns(2)
+                col_cfg1, col_cfg2, col_cfg3 = st.columns(3)
                 with col_cfg1:
                     graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프", "산점도 (Scatter)", "영역형 그래프", "히스토그램", "박스 플롯"])
                     graph_title = st.text_input("그래프 제목", "데이터 분석 결과")
                 with col_cfg2:
                     style = st.selectbox("그래프 테마(Style)", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
                     show_mean = st.checkbox("평균선 표시")
+                with col_cfg3:
+                    # 🔥 [추가] 점 크기 조절 슬라이더 및 레이블(값) 표시 토글
+                    marker_size = st.slider("점/마커 크기", min_value=4, max_value=24, value=10, step=2)
+                    show_labels = st.checkbox("데이터 레이블(값) 표시", value=False)
 
                 # 컬럼별 스타일 설정
                 st.write("🖌️ **컬럼별 스타일 지정**")
@@ -188,7 +192,6 @@ if df is not None:
                     import plotly.express as px
                     import plotly.graph_objects as go
                     
-                    # 가져온 폰트가 있으면 Plotly 레이아웃에 먹이기 위한 폰트명 추출
                     p_font_name = "sans-serif"
                     if selected_font_file and os.path.exists(selected_font_file):
                         try:
@@ -197,38 +200,54 @@ if df is not None:
                             pass
 
                     fig = go.Figure()
-                    color_map = [column_styles[c]['color'] for c in selected_columns]
+                    
+                    # 레이블 모드 텍스트 정의
+                    text_template = "%{y}" if show_labels else None
 
                     if graph_type == "막대 그래프":
                         for col in selected_columns:
-                            fig.add_trace(go.Bar(x=df[x_col], y=df[col], name=col, marker_color=column_styles[col]['color']))
+                            fig.add_trace(go.Bar(x=df[x_col], y=df[col], name=col, 
+                                                 marker_color=column_styles[col]['color'],
+                                                 text=df[col] if show_labels else None,
+                                                 textposition='auto'))
                         fig.update_layout(barmode='group')
 
                     elif graph_type == "꺾은선 그래프":
                         for col in selected_columns:
-                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode='lines+markers',
+                            mode_choice = 'lines+markers+text' if show_labels else 'lines+markers'
+                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode=mode_choice,
                                                  line=dict(color=column_styles[col]['color'], width=2),
-                                                 marker=dict(symbol=column_styles[col]['plotly_marker'], size=10)))
+                                                 marker=dict(symbol=column_styles[col]['plotly_marker'], size=marker_size),
+                                                 text=df[col] if show_labels else None,
+                                                 textposition='top center'))
 
                     elif graph_type == "산점도 (Scatter)":
                         for col in selected_columns:
-                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode='markers',
-                                                 marker=dict(symbol=column_styles[col]['plotly_marker'], size=12, color=column_styles[col]['color'],
-                                                            line=dict(width=1, color='Black'))))
+                            mode_choice = 'markers+text' if show_labels else 'markers'
+                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode=mode_choice,
+                                                 marker=dict(symbol=column_styles[col]['plotly_marker'], size=marker_size + 2, color=column_styles[col]['color'],
+                                                            line=dict(width=1, color='Black')),
+                                                 text=df[col] if show_labels else None,
+                                                 textposition='top center'))
 
                     elif graph_type == "영역형 그래프":
                         for col in selected_columns:
-                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode='lines', fill='tozeroy',
-                                                 line=dict(color=column_styles[col]['color']), fillcolor=column_styles[col]['color']))
+                            mode_choice = 'lines+text' if show_labels else 'lines'
+                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode=mode_choice, fill='tozeroy',
+                                                 line=dict(color=column_styles[col]['color']), fillcolor=column_styles[col]['color'],
+                                                 text=df[col] if show_labels else None,
+                                                 textposition='top center'))
 
                     elif graph_type == "히스토그램":
                         for col in selected_columns:
                             fig.add_trace(go.Histogram(x=df[col], name=col, marker_color=column_styles[col]['color'], opacity=0.6))
                         fig.update_layout(barmode='overlay')
+                        if show_labels:
+                            fig.update_traces(texttemplate="%{y}", textposition="outside")
 
                     elif graph_type == "박스 플롯":
                         for col in selected_columns:
-                            fig.add_trace(go.Box(y=df[col], name=col, marker_color=column_styles[col]['color']))
+                            fig.add_trace(go.Box(y=df[col], name=col, marker_color=column_styles[col]['color'], boxpoints='all' if show_labels else 'outliers'))
 
                     # 공통 평균선 옵션
                     if show_mean and graph_type not in ["히스토그램", "박스 플롯"]:
@@ -237,7 +256,6 @@ if df is not None:
                             fig.add_hline(y=m_val, line_dash="dash", line_color=column_styles[col]['color'], 
                                           annotation_text=f"{col} 평균", annotation_position="top right")
 
-                    # 레이아웃 업데이트 및 폰트 강제 매핑
                     fig.update_layout(
                         title=graph_title,
                         xaxis_title=x_col if graph_type not in ["히스토그램", "박스 플롯"] else "",
@@ -255,11 +273,17 @@ if df is not None:
                     set_korean_font(selected_font_file) 
                     plt.close('all') 
                     
+                    fig, ax = plt.subplots(figsize=(10, 5))
+                    
                     if graph_type in ["히스토그램", "박스 플롯"]:
-                        fig, ax = plt.subplots(figsize=(10, 5))
                         if graph_type == "히스토그램":
                             for col in selected_columns:
-                                ax.hist(df[col], bins=20, alpha=0.5, label=col, color=column_styles[col]['color'], edgecolor='black')
+                                counts, bins, patches = ax.hist(df[col], bins=20, alpha=0.5, label=col, color=column_styles[col]['color'], edgecolor='black')
+                                # 히스토그램 레이블 추가
+                                if show_labels:
+                                    for count, bin_edge in zip(counts, bins):
+                                        if count > 0:
+                                            ax.text(bin_edge + (bins[1]-bins[0])/2, count, f'{int(count)}', ha='center', va='bottom', fontsize=9)
                             ax.set_ylabel("빈도수")
                             ax.set_xlabel("값 범위")
                             ax.legend()
@@ -271,13 +295,18 @@ if df is not None:
                                     if idx < len(bp_dict['boxes']):
                                         bp_dict['boxes'][idx].set_facecolor(column_styles[col]['color'])
                                         bp_dict['boxes'][idx].set_alpha(0.7)
+                                        
+                                        # 박스 플롯 값 레이블 추가 (중앙값 및 기본 통계치)
+                                        if show_labels:
+                                            med = df_box[col].median()
+                                            ax.text(idx + 1, med, f'{med:.1f}', ha='center', va='bottom', fontweight='bold', color='black', bbox=dict(facecolor='white', alpha=0.6, boxstyle='round,pad=0.2'))
+                                            
                                 for median in bp_dict['medians']:
                                     median.set_color('black')
                                     median.set_linewidth(1.5)
                                 ax.set_ylabel("값 분포")
                                 ax.grid(True, linestyle=':', alpha=0.6)
                     else:
-                        fig, ax = plt.subplots(figsize=(10, 5))
                         x_data = df[x_col].astype(str).tolist()
                         n_cols = len(selected_columns)
                         
@@ -287,31 +316,50 @@ if df is not None:
                             width = 0.8 / n_cols
                             for idx, col in enumerate(selected_columns):
                                 offset = (idx - (n_cols - 1) / 2) * width
-                                ax.bar(x_indexes + offset, df[col], width=width, label=col, color=column_styles[col]['color'])
+                                bars = ax.bar(x_indexes + offset, df[col], width=width, label=col, color=column_styles[col]['color'])
+                                
+                                # 막대 그래프 레이블 부착
+                                if show_labels:
+                                    ax.bar_label(bars, padding=3, fmt='%g', fontsize=9)
+                                    
                             ax.set_xticks(x_indexes)
                             ax.set_xticklabels(x_data, rotation=45)
                         
                         elif graph_type == "꺾은선 그래프":
                             for col in selected_columns:
-                                ax.plot(x_data, df[col], marker=column_styles[col]['mpl_marker'], linewidth=2, markersize=8, label=col, color=column_styles[col]['color'])
+                                line, = ax.plot(x_data, df[col], marker=column_styles[col]['mpl_marker'], linewidth=2, markersize=marker_size, label=col, color=column_styles[col]['color'])
+                                
+                                # 꺾은선 레이블 부착
+                                if show_labels:
+                                    for x, y in zip(x_data, df[col]):
+                                        ax.text(x, y, f'{y:%g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
                             
                         elif graph_type == "산점도 (Scatter)":
                             for col in selected_columns:
-                                ax.scatter(x_data, df[col], s=100, marker=column_styles[col]['mpl_marker'], label=col, color=column_styles[col]['color'], alpha=0.8, edgecolors='black')
+                                ax.scatter(x_data, df[col], s=marker_size**2, marker=column_styles[col]['mpl_marker'], label=col, color=column_styles[col]['color'], alpha=0.8, edgecolors='black')
+                                
+                                # 산점도 레이블 부착
+                                if show_labels:
+                                    for x, y in zip(x_data, df[col]):
+                                        ax.text(x, y, f'{y:%g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
                             
                         elif graph_type == "영역형 그래프":
                             for col in selected_columns:
                                 ax.fill_between(x_data, df[col], label=col, color=column_styles[col]['color'], alpha=0.3)
                                 ax.plot(x_data, df[col], color=column_styles[col]['color'], linewidth=1)
+                                
+                                if show_labels:
+                                    for x, y in zip(x_data, df[col]):
+                                        ax.text(x, y, f'{y:%g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
 
                     if show_mean and graph_type not in ["히스토그램", "박스 플롯"]:
                         for col in selected_columns:
                             ax.axhline(df[col].mean(), color=column_styles[col]['color'], linestyle='--', alpha=0.6)
 
-                    # 폰트 매핑
+                    # 폰트 매핑 스타일 적용
                     if selected_font_file and os.path.exists(selected_font_file):
                         font_p = font_manager.FontProperties(fname=os.path.abspath(selected_font_file))
                         ax.set_title(graph_title, pad=15, fontproperties=font_p, fontsize=16)
