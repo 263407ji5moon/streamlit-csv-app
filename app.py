@@ -214,34 +214,30 @@ if df is not None:
 
                     elif graph_type == "꺾은선 그래프":
                         for col in selected_columns:
-                            line, = ax.plot(x_data, df[col], marker=column_styles[col]['mpl_marker'], linewidth=2, markersize=marker_size, label=col, color=column_styles[col]['color'])
-                
-                            # 꺾은선 레이블 부착 (🔥 %g -> :g 로 수정)
-                            if show_labels:
-                                for x, y in zip(x_data, df[col]):
-                                    ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
-                        plt.xticks(rotation=45)
-                            
+                            mode_choice = 'lines+markers+text' if show_labels else 'lines+markers'
+                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode=mode_choice,
+                                                 line=dict(color=column_styles[col]['color'], width=2),
+                                                 marker=dict(symbol=column_styles[col]['plotly_marker'], size=marker_size),
+                                                 text=df[col] if show_labels else None,
+                                                 textposition='top center'))
+
                     elif graph_type == "산점도 (Scatter)":
                         for col in selected_columns:
-                            ax.scatter(x_data, df[col], s=marker_size**2, marker=column_styles[col]['mpl_marker'], label=col, color=column_styles[col]['color'], alpha=0.8, edgecolors='black')
-                                
-                            # 산점도 레이블 부착 (🔥 %g -> :g 로 수정)
-                            if show_labels:
-                                for x, y in zip(x_data, df[col]):
-                                    ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
-                            plt.xticks(rotation=45)
-                            
+                            mode_choice = 'markers+text' if show_labels else 'markers'
+                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode=mode_choice,
+                                                 marker=dict(symbol=column_styles[col]['plotly_marker'], size=marker_size + 2, color=column_styles[col]['color'],
+                                                            line=dict(width=1, color='Black')),
+                                                 text=df[col] if show_labels else None,
+                                                 textposition='top center'))
+
                     elif graph_type == "영역형 그래프":
-                            for col in selected_columns:
-                                ax.fill_between(x_data, df[col], label=col, color=column_styles[col]['color'], alpha=0.3)
-                                ax.plot(x_data, df[col], color=column_styles[col]['color'], linewidth=1)
-                                
-                                # 영역형 레이블 부착 (🔥 %g -> :g 로 수정)
-                                if show_labels:
-                                    for x, y in zip(x_data, df[col]):
-                                        ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
-                            plt.xticks(rotation=45)
+                        for col in selected_columns:
+                            mode_choice = 'lines+text' if show_labels else 'lines'
+                            fig.add_trace(go.Scatter(x=df[x_col], y=df[col], name=col, mode=mode_choice, fill='tozeroy',
+                                                 line=dict(color=column_styles[col]['color']), fillcolor=column_styles[col]['color'],
+                                                 text=df[col] if show_labels else None,
+                                                 textposition='top center'))
+
                     elif graph_type == "히스토그램":
                         for col in selected_columns:
                             fig.add_trace(go.Histogram(x=df[col], name=col, marker_color=column_styles[col]['color'], opacity=0.6))
@@ -333,20 +329,20 @@ if df is not None:
                             for col in selected_columns:
                                 line, = ax.plot(x_data, df[col], marker=column_styles[col]['mpl_marker'], linewidth=2, markersize=marker_size, label=col, color=column_styles[col]['color'])
                                 
-                                # 꺾은선 레이블 부착
+                                # 꺾은선 레이블 부착 (🔥 %g -> :g 로 수정)
                                 if show_labels:
                                     for x, y in zip(x_data, df[col]):
-                                        ax.text(x, y, f'{y:%g}', ha='center', va='bottom', fontsize=9)
+                                        ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
                             
                         elif graph_type == "산점도 (Scatter)":
                             for col in selected_columns:
                                 ax.scatter(x_data, df[col], s=marker_size**2, marker=column_styles[col]['mpl_marker'], label=col, color=column_styles[col]['color'], alpha=0.8, edgecolors='black')
                                 
-                                # 산점도 레이블 부착
+                                # 산점도 레이블 부착 (🔥 %g -> :g 로 수정)
                                 if show_labels:
                                     for x, y in zip(x_data, df[col]):
-                                        ax.text(x, y, f'{y:%g}', ha='center', va='bottom', fontsize=9)
+                                        ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
                             
                         elif graph_type == "영역형 그래프":
@@ -354,11 +350,11 @@ if df is not None:
                                 ax.fill_between(x_data, df[col], label=col, color=column_styles[col]['color'], alpha=0.3)
                                 ax.plot(x_data, df[col], color=column_styles[col]['color'], linewidth=1)
                                 
+                                # 영역형 레이블 부착 (🔥 %g -> :g 로 수정)
                                 if show_labels:
                                     for x, y in zip(x_data, df[col]):
-                                        ax.text(x, y, f'{y:%g}', ha='center', va='bottom', fontsize=9)
+                                        ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
-
                     if show_mean and graph_type not in ["히스토그램", "박스 플롯"]:
                         for col in selected_columns:
                             ax.axhline(df[col].mean(), color=column_styles[col]['color'], linestyle='--', alpha=0.6)
