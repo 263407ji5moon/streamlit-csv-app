@@ -154,9 +154,10 @@ if df is not None:
                     style = st.selectbox("그래프 테마(Style)", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
                     show_mean = st.checkbox("평균선 표시")
                 with col_cfg3:
-                    # 🔥 [추가] 점 크기 조절 슬라이더 및 레이블(값) 표시 토글
                     marker_size = st.slider("점/마커 크기", min_value=4, max_value=24, value=10, step=2)
                     show_labels = st.checkbox("데이터 레이블(값) 표시", value=False)
+                    # 🔥 [추가] 범례 제어 체크박스 (기본값 True)
+                    show_legend = st.checkbox("범례(Legend) 표시", value=True)
 
                 # 컬럼별 스타일 설정
                 st.write("🖌️ **컬럼별 스타일 지정**")
@@ -200,9 +201,6 @@ if df is not None:
                             pass
 
                     fig = go.Figure()
-                    
-                    # 레이블 모드 텍스트 정의
-                    text_template = "%{y}" if show_labels else None
 
                     if graph_type == "막대 그래프":
                         for col in selected_columns:
@@ -256,12 +254,14 @@ if df is not None:
                             fig.add_hline(y=m_val, line_dash="dash", line_color=column_styles[col]['color'], 
                                           annotation_text=f"{col} 평균", annotation_position="top right")
 
+                    # 레이아웃 업데이트 및 범례 유무 제어
                     fig.update_layout(
                         title=graph_title,
                         xaxis_title=x_col if graph_type not in ["히스토그램", "박스 플롯"] else "",
                         yaxis_title="수치" if graph_type not in ["히스토그램", "박스 플롯"] else "",
                         font=dict(family=p_font_name, size=13),
-                        template="plotly_white"
+                        template="plotly_white",
+                        showlegend=show_legend # 🔥 [Plotly] 범례 토글 적용
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
@@ -285,7 +285,7 @@ if df is not None:
                                             ax.text(bin_edge + (bins[1]-bins[0])/2, count, f'{int(count)}', ha='center', va='bottom', fontsize=9)
                             ax.set_ylabel("빈도수")
                             ax.set_xlabel("값 범위")
-                            ax.legend() # 히스토그램 범례 추가
+                            if show_legend: ax.legend() # 🔥 [Matplotlib] 히스토그램 범례 제어
                         elif graph_type == "박스 플롯":
                             df_box = df[selected_columns].dropna()
                             if not df_box.empty:
@@ -345,8 +345,9 @@ if df is not None:
                                         ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
                         
-                        # 🔥 [핵심 수정] 일반 그래프(막대, 선, 산점도, 영역)에 범례 출력 함수 추가
-                        ax.legend()
+                        # 🔥 [Matplotlib] 체크 여부에 따른 일반 그래프 범례 노출
+                        if show_legend:
+                            ax.legend()
 
                     if show_mean and graph_type not in ["히스토그램", "박스 플롯"]:
                         for col in selected_columns:
@@ -367,38 +368,8 @@ if df is not None:
                         for tick in ax.get_yticklabels():
                             tick.set_fontproperties(font_p)
                         
-                        # 🔥 [핵심 수정] 범례 안의 텍스트 한글 폰트 지정 안전장치 강화
-                        if ax.get_legend():
-                            plt.setp(ax.get_legend().get_texts(), fontproperties=font_p)
-                    else:
-                        ax.set_title(graph_title, pad=15, fontsize=16)
-                        if graph_type not in ["히스토그램", "박스 플롯"]:
-                            ax.set_ylabel("수치")
-                            ax.set_xlabel(x_col)
-                        
-                    ax.grid(True, linestyle=':', alpha=0.6)
-                    plt.tight_layout()
-                    st.pyplot(fig)
-
-                    buf = io.BytesIO()
-                    fig.savefig(buf, format="png", bbox_inches='tight', dpi=150)
-                    st.download_button("📥 그래프 결과 저장 (PNG)", buf.getvalue(), "graph_result.png", "image/png")
-
-                    # 폰트 매핑 스타일 적용
-                    if selected_font_file and os.path.exists(selected_font_file):
-                        font_p = font_manager.FontProperties(fname=os.path.abspath(selected_font_file))
-                        ax.set_title(graph_title, pad=15, fontproperties=font_p, fontsize=16)
-                        if graph_type not in ["히스토그램", "박스 플롯"]:
-                            ax.set_ylabel("수치", fontproperties=font_p)
-                            ax.set_xlabel(x_col, fontproperties=font_p)
-                        else:
-                            ax.xaxis.label.set_fontproperties(font_p)
-                            ax.yaxis.label.set_fontproperties(font_p)
-                        for tick in ax.get_xticklabels():
-                            tick.set_fontproperties(font_p)
-                        for tick in ax.get_yticklabels():
-                            tick.set_fontproperties(font_p)
-                        if ax.get_legend():
+                        # 범례 폰트 지정 안전장치 (켜져 있을 때만 실행)
+                        if show_legend and ax.get_legend():
                             plt.setp(ax.get_legend().get_texts(), fontproperties=font_p)
                     else:
                         ax.set_title(graph_title, pad=15, fontsize=16)
