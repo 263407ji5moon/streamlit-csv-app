@@ -279,14 +279,13 @@ if df is not None:
                         if graph_type == "히스토그램":
                             for col in selected_columns:
                                 counts, bins, patches = ax.hist(df[col], bins=20, alpha=0.5, label=col, color=column_styles[col]['color'], edgecolor='black')
-                                # 히스토그램 레이블 추가
                                 if show_labels:
                                     for count, bin_edge in zip(counts, bins):
                                         if count > 0:
                                             ax.text(bin_edge + (bins[1]-bins[0])/2, count, f'{int(count)}', ha='center', va='bottom', fontsize=9)
                             ax.set_ylabel("빈도수")
                             ax.set_xlabel("값 범위")
-                            ax.legend()
+                            ax.legend() # 히스토그램 범례 추가
                         elif graph_type == "박스 플롯":
                             df_box = df[selected_columns].dropna()
                             if not df_box.empty:
@@ -296,7 +295,6 @@ if df is not None:
                                         bp_dict['boxes'][idx].set_facecolor(column_styles[col]['color'])
                                         bp_dict['boxes'][idx].set_alpha(0.7)
                                         
-                                        # 박스 플롯 값 레이블 추가 (중앙값 및 기본 통계치)
                                         if show_labels:
                                             med = df_box[col].median()
                                             ax.text(idx + 1, med, f'{med:.1f}', ha='center', va='bottom', fontweight='bold', color='black', bbox=dict(facecolor='white', alpha=0.6, boxstyle='round,pad=0.2'))
@@ -317,19 +315,14 @@ if df is not None:
                             for idx, col in enumerate(selected_columns):
                                 offset = (idx - (n_cols - 1) / 2) * width
                                 bars = ax.bar(x_indexes + offset, df[col], width=width, label=col, color=column_styles[col]['color'])
-                                
-                                # 막대 그래프 레이블 부착
                                 if show_labels:
                                     ax.bar_label(bars, padding=3, fmt='%g', fontsize=9)
-                                    
                             ax.set_xticks(x_indexes)
                             ax.set_xticklabels(x_data, rotation=45)
                         
                         elif graph_type == "꺾은선 그래프":
                             for col in selected_columns:
-                                line, = ax.plot(x_data, df[col], marker=column_styles[col]['mpl_marker'], linewidth=2, markersize=marker_size, label=col, color=column_styles[col]['color'])
-                                
-                                # 꺾은선 레이블 부착 (🔥 %g -> :g 로 수정)
+                                ax.plot(x_data, df[col], marker=column_styles[col]['mpl_marker'], linewidth=2, markersize=marker_size, label=col, color=column_styles[col]['color'])
                                 if show_labels:
                                     for x, y in zip(x_data, df[col]):
                                         ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
@@ -338,8 +331,6 @@ if df is not None:
                         elif graph_type == "산점도 (Scatter)":
                             for col in selected_columns:
                                 ax.scatter(x_data, df[col], s=marker_size**2, marker=column_styles[col]['mpl_marker'], label=col, color=column_styles[col]['color'], alpha=0.8, edgecolors='black')
-                                
-                                # 산점도 레이블 부착 (🔥 %g -> :g 로 수정)
                                 if show_labels:
                                     for x, y in zip(x_data, df[col]):
                                         ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
@@ -349,15 +340,49 @@ if df is not None:
                             for col in selected_columns:
                                 ax.fill_between(x_data, df[col], label=col, color=column_styles[col]['color'], alpha=0.3)
                                 ax.plot(x_data, df[col], color=column_styles[col]['color'], linewidth=1)
-                                
-                                # 영역형 레이블 부착 (🔥 %g -> :g 로 수정)
                                 if show_labels:
                                     for x, y in zip(x_data, df[col]):
                                         ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
+                        
+                        # 🔥 [핵심 수정] 일반 그래프(막대, 선, 산점도, 영역)에 범례 출력 함수 추가
+                        ax.legend()
+
                     if show_mean and graph_type not in ["히스토그램", "박스 플롯"]:
                         for col in selected_columns:
                             ax.axhline(df[col].mean(), color=column_styles[col]['color'], linestyle='--', alpha=0.6)
+
+                    # 폰트 매핑 스타일 적용
+                    if selected_font_file and os.path.exists(selected_font_file):
+                        font_p = font_manager.FontProperties(fname=os.path.abspath(selected_font_file))
+                        ax.set_title(graph_title, pad=15, fontproperties=font_p, fontsize=16)
+                        if graph_type not in ["히스토그램", "박스 플롯"]:
+                            ax.set_ylabel("수치", fontproperties=font_p)
+                            ax.set_xlabel(x_col, fontproperties=font_p)
+                        else:
+                            ax.xaxis.label.set_fontproperties(font_p)
+                            ax.yaxis.label.set_fontproperties(font_p)
+                        for tick in ax.get_xticklabels():
+                            tick.set_fontproperties(font_p)
+                        for tick in ax.get_yticklabels():
+                            tick.set_fontproperties(font_p)
+                        
+                        # 🔥 [핵심 수정] 범례 안의 텍스트 한글 폰트 지정 안전장치 강화
+                        if ax.get_legend():
+                            plt.setp(ax.get_legend().get_texts(), fontproperties=font_p)
+                    else:
+                        ax.set_title(graph_title, pad=15, fontsize=16)
+                        if graph_type not in ["히스토그램", "박스 플롯"]:
+                            ax.set_ylabel("수치")
+                            ax.set_xlabel(x_col)
+                        
+                    ax.grid(True, linestyle=':', alpha=0.6)
+                    plt.tight_layout()
+                    st.pyplot(fig)
+
+                    buf = io.BytesIO()
+                    fig.savefig(buf, format="png", bbox_inches='tight', dpi=150)
+                    st.download_button("📥 그래프 결과 저장 (PNG)", buf.getvalue(), "graph_result.png", "image/png")
 
                     # 폰트 매핑 스타일 적용
                     if selected_font_file and os.path.exists(selected_font_file):
