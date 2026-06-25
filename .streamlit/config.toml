@@ -1,0 +1,6 @@
+[theme]
+base="light"                  # 기본 모드 ("light" 또는 "dark")
+primaryColor="#F39C12"        # 버튼, 선택박스 등 포인트 강조 색상
+backgroundColor="#FFFFFF"     # 메인 화면 배경색
+secondaryBackgroundColor="#F0F0F0" # 사이드바 및 위젯 배경색
+textColor="#31333F"           # 글자 색상
