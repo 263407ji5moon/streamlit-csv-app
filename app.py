@@ -122,9 +122,7 @@ else:
 if raw_df is not None:
     df = raw_df.copy()
     
-    # ------------------------------------------
-    # 🧮 [기능 4] 파생 변수 계산기 기능 추가
-    # ------------------------------------------
+    # 🧮 파생 변수 계산기
     st.sidebar.markdown("---")
     st.sidebar.header("🧮 파생 변수 추가")
     calc_on = st.sidebar.checkbox("새로운 계산 컬럼 만들기")
@@ -148,14 +146,11 @@ if raw_df is not None:
         else:
             st.sidebar.warning("파생 변수를 만들려면 최소 2개 이상의 숫자 컬럼이 필요합니다.")
 
-    # ------------------------------------------
-    # 🔍 [기능 3] 데이터 필터링 기능 추가 (사이드바 하단)
-    # ------------------------------------------
+    # 🔍 데이터 필터링
     st.sidebar.markdown("---")
     st.sidebar.header("🔍 데이터 범위 필터")
     min_row, max_row = st.sidebar.slider("분석할 행 범위 선택", 0, len(df), (0, len(df)))
     df = df.iloc[min_row:max_row].reset_index(drop=True)
-
 
     tab1, tab2 = st.tabs(["🔍 데이터 미리보기 및 요약", "📈 그래프 고급 분석"])
 
@@ -179,7 +174,6 @@ if raw_df is not None:
             with col_cfg1:
                 graph_type = st.selectbox("그래프 종류", ["막대 그래프", "꺾은선 그래프", "산점도 (Scatter)", "영역형 그래프", "히스토그램", "박스 플롯"])
                 graph_title = st.text_input("그래프 제목", "데이터 분석 결과")
-                # 🔀 [기능 2] X축 컬럼 자유 선택 기능
                 x_col = st.selectbox("X축 컬럼 선택 (히스토그램/박스플롯 제외)", all_columns, index=0)
             with col_cfg2:
                 style = st.selectbox("그래프 테마(Style)", plt.style.available, index=plt.style.available.index('default') if 'default' in plt.style.available else 0)
@@ -189,11 +183,9 @@ if raw_df is not None:
                 marker_size = st.slider("점/마커 크기", min_value=4, max_value=24, value=10, step=2)
                 show_labels = st.checkbox("데이터 레이블(값) 표시", value=False)
                 show_legend = st.checkbox("범례(Legend) 표시", value=True)
-                # 📈 [기능 1] 추세선 옵션 체크박스
                 show_trend = st.checkbox("📈 추세선(Trendline) 표시", value=False)
 
             if selected_columns:
-                # 컬럼별 스타일 설정
                 st.write("🖌️ **컬럼별 디자인 지정**")
                 column_styles = {}
                 default_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
@@ -231,6 +223,7 @@ if raw_df is not None:
                         except: pass
 
                     fig = go.Figure()
+                    x_data_raw = df[x_col].tolist()
 
                     if graph_type == "막대 그래프":
                         for col in selected_columns:
@@ -272,19 +265,24 @@ if raw_df is not None:
                         for col in selected_columns:
                             fig.add_trace(go.Box(y=df[col], name=col, marker_color=column_styles[col]['color'], boxpoints='all' if show_labels else 'outliers'))
 
-                    # [기능 1 적용] Plotly 추세선 계산 및 주입
+                    # 🔥 [Plotly 수정] 문자열 X축(월별)이라도 인덱스로 추세선 계산 가능하도록 변경
                     if show_trend and graph_type in ["꺾은선 그래프", "산점도 (Scatter)"]:
                         try:
-                            # X가 숫자형일 때만 선형회귀선 자동 추정 동작
                             x_numeric = pd.to_numeric(df[x_col], errors='coerce')
-                            if not x_numeric.isna().any():
-                                for col in selected_columns:
-                                    mask = ~x_numeric.isna() & ~df[col].isna()
-                                    z = np.polyfit(x_numeric[mask], df[col][mask], 1)
-                                    p = np.poly1d(z)
-                                    fig.add_trace(go.Scatter(x=df[x_col], y=p(x_numeric), name=f"{col} 추세선",
-                                                             line=dict(color=column_styles[col]['color'], dash='dot', width=2)))
-                        except: pass
+                            # 만약 변환 실패(문자열)인 경우 연속된 숫자로 강제 인덱싱 매핑
+                            if x_numeric.isna().any():
+                                x_calc = np.arange(len(df))
+                            else:
+                                x_calc = x_numeric.values
+                                
+                            for col in selected_columns:
+                                mask = ~np.isnan(x_calc) & ~df[col].isna()
+                                z = np.polyfit(x_calc[mask], df[col][mask], 1)
+                                p = np.poly1d(z)
+                                fig.add_trace(go.Scatter(x=df[x_col], y=p(x_calc), name=f"{col} 추세선",
+                                                         line=dict(color=column_styles[col]['color'], dash='dot', width=2)))
+                        except Exception as e:
+                            pass
 
                     if show_mean and graph_type not in ["히스토그램", "박스 플롯"]:
                         for col in selected_columns:
@@ -373,16 +371,21 @@ if raw_df is not None:
                                     for x, y in zip(x_data, df[col]): ax.text(x, y, f'{y:g}', ha='center', va='bottom', fontsize=9)
                             plt.xticks(rotation=45)
 
-                        # [기능 1 적용] Matplotlib 추세선 주입
+                        # 🔥 [Matplotlib 수정] 문자열 X축(월별)이라도 가상 인덱스 기반으로 추세선 그리도록 전면 개편
                         if show_trend and graph_type in ["꺾은선 그래프", "산점도 (Scatter)"]:
                             try:
                                 x_numeric = pd.to_numeric(df[x_col], errors='coerce')
-                                if not x_numeric.isna().any():
-                                    x_idx = np.arange(len(x_data))
-                                    for col in selected_columns:
-                                        z = np.polyfit(x_idx, df[col], 1)
-                                        p = np.poly1d(z)
-                                        ax.plot(x_idx, p(x_idx), color=column_styles[col]['color'], linestyle=':', linewidth=2, label=f"{col} 추세")
+                                if x_numeric.isna().any():
+                                    x_calc = np.arange(len(df))
+                                else:
+                                    x_calc = x_numeric.values
+                                    
+                                for col in selected_columns:
+                                    mask = ~np.isnan(x_calc) & ~df[col].isna()
+                                    z = np.polyfit(x_calc[mask], df[col][mask], 1)
+                                    p = np.poly1d(z)
+                                    # 문자열 축 매핑과의 정렬 매칭을 위해 x_data 길이 규격과 연동
+                                    ax.plot(x_data, p(x_calc), color=column_styles[col]['color'], linestyle=':', linewidth=2, label=f"{col} 추세선")
                             except: pass
                         
                         if show_legend: ax.legend()
